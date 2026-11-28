@@ -73,7 +73,7 @@ Your output will be programmatically parsed and must follow this specification e
       console.log("Sending prompt to Gemini:", prompt);
 
       const model = this.genAI.getGenerativeModel({
-        model: 'gemini-3.0-flash',
+        model: 'gemini-3-flash-preview',
         generationConfig: { responseMimeType: 'application/json' },
       });
 
