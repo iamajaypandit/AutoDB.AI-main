@@ -1,30 +1,26 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import 'dotenv/config';
 
-// the newest Anthropic model is "claude-3-7-sonnet-20250219" which was released February 24, 2025
-
 export class AnthropicService {
-  private anthropic: Anthropic;
-  
+  private genAI: GoogleGenerativeAI;
+
   constructor() {
-    this.anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
   }
 
   async generateDatabaseSchema(prompt: string, dbType: string = 'mysql'): Promise<{ schema: DatabaseSchema; sqlCode: string }> {
+    let content = '';
     try {
-      const systemPrompt = `You are an expert database architect who generates valid database schemas from descriptions.  
+      const systemPrompt = `You are an expert database architect who generates valid database schemas from descriptions.
 
-Your task is to:  
-1. Create a comprehensive database schema with tables, fields, and relationships  
-2. Ensure that relationships between entities are created directly without unnecessary intermediate reference tables  
-3. Automatically generate all possible and valid relationships between entities without requiring manual edits  
-4. Output valid SQL to create this schema  
-5. Return ONLY a properly formatted JSON object with the schema and SQL  
+Your task is to:
+1. Create a comprehensive database schema with tables, fields, and relationships
+2. Ensure that relationships between entities are created directly without unnecessary intermediate reference tables
+3. Automatically generate all possible and valid relationships between entities without requiring manual edits
+4. Output valid SQL to create this schema
+5. Return ONLY a properly formatted JSON object with the schema and SQL
 
-**RESPONSE FORMAT** - Your entire response must be a single valid JSON object:  
-
+**RESPONSE FORMAT** - Your entire response must be a single valid JSON object:
 {
   "schema": {
     "entities": [
@@ -43,7 +39,7 @@ Your task is to:
             "defaultValue": null
           }
         ],
-        "position": {"x": 100, "y": 100}
+        "position": { "x": 100, "y": 100 }
       }
     ],
     "relationships": [
@@ -60,36 +56,37 @@ Your task is to:
   "sqlCode": "CREATE TABLE..."
 }
 
-**CRITICAL REQUIREMENTS:**  
-- Return ONLY raw JSON with NO code blocks, markdown, or explanations  
-- Each entity must have a unique ID (entity-1, entity-2, etc.)  
-- Each field must have a unique ID within its entity (field-N-1, field-N-2, etc.)  
-- Relationships must be created **directly between entities** without generating an extra reference table unless absolutely necessary (e.g., for many-to-many relationships)  
-- AI must **automatically** detect and generate **all possible valid relationships** based on the given description  
-- SQL code should be valid ${dbType} syntax  
-- The entire response must parse as valid JSON  
-- Use reasonable x/y coordinates for entity positions (spread between 100-800)  
+**CRITICAL REQUIREMENTS:**
+- Return ONLY raw JSON with NO code blocks, markdown, or explanations
+- Each entity must have a unique ID (entity-1, entity-2, etc.)
+- Each field must have a unique ID within its entity (field-1-1, field-1-2, etc.)
+- Relationships must be created *directly between entities* without generating an extra reference table unless absolutely necessary
+- AI must **automatically** detect and generate **all possible valid relationships** based on the given description
+- SQL code should be valid ${dbType} syntax
+- The entire response must parse as valid JSON
+- Use reasonable x/y coordinates for entity positions (spread between 100-800)
 
 Your output will be programmatically parsed and must follow this specification exactly.
 `;
 
-      // Call Anthropic API
-      console.log("Sending prompt to Anthropic:", prompt);
-      
-      const response = await this.anthropic.messages.create({
-        model: 'claude-3-7-sonnet-20250219',
-        max_tokens: 4000,
-        system: systemPrompt + "\n\nIMPORTANT: Your entire response MUST be a valid JSON object. No markdown code blocks or explanations - JUST the raw JSON object.",
-        messages: [
-          { role: 'user', content: prompt }
-        ],
+      // Call Gemini API
+      console.log("Sending prompt to Gemini:", prompt);
+
+      const model = this.genAI.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        generationConfig: { responseMimeType: 'application/json' },
       });
-      
-      console.log("Raw response from Anthropic API:", JSON.stringify(response, null, 2));
+
+      const result = await model.generateContent(
+        `${systemPrompt}\n\nIMPORTANT: Your entire response MUST be a valid JSON object. No markdown code blocks.\n\nUser request: ${prompt}`
+      );
+     content = result.response.text();
+
+      console.log("Raw response from Gemini API:", content);
       
       try {
         // Extract and parse the JSON response
-        const content = response.content[0].type === 'text' ? response.content[0].text : '';
+
         console.log("Received Anthropic response:", content);
         
         // Try several strategies to extract valid JSON
